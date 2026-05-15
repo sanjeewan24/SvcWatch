@@ -1,0 +1,7 @@
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\SvchostMonitor.csproj.AssemblyReference.cache
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\App.baml
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\App.g.cs
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\SvchostMonitor_MarkupCompile.cache
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\MainWindow.g.cs
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\GeneratedInternalTypeHelper.g.cs
+D:\Sanjeewan\1ASanjeewan\Projects\SvcWatch\SvcWatch\obj\Release\net10.0-windows10.0.19041.0\win-x64\SvchostMonitor_MarkupCompile.lref
