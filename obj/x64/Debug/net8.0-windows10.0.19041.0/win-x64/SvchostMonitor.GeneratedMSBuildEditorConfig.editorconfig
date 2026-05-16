@@ -1,5 +1,4 @@
 is_global = true
-build_property.MvvmToolkitEnableINotifyPropertyChangingSupport = true
 build_property.TargetFramework = net8.0-windows10.0.19041.0
 build_property.TargetFrameworkIdentifier = .NETCoreApp
 build_property.TargetFrameworkVersion = v8.0

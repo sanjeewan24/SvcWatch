@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SvchostMonitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+910ce8775776ab1ff816fdb35a39a65db9eb430b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3d5656cd8a02db6b57ba191a27146f30370f749d")]
 [assembly: System.Reflection.AssemblyProductAttribute("SvchostMonitor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SvchostMonitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
