@@ -13,8 +13,16 @@ primary
 lastDtbSucceeded
 
 [properties]
+AssemblyName=SvchostMonitor
 CommandLineArgsForDesignTimeEvaluation=-langversion:12.0 -define:TRACE
+CompilerGeneratedFilesOutputPath=
 MaxSupportedLangVersion=12.0
+ProjectAssetsFile=<PATH>obj/project.assets.json
+RootNamespace=SvchostMonitor
+RunAnalyzers=
+RunAnalyzersDuringLiveAnalysis=
+SolutionPath=*Undefined*
+TargetFrameworkIdentifier=.NETCoreApp
 TargetPath=<PATH>bin/x64/Debug/net8.0-windows10.0.19041.0/win-x64/SvchostMonitor.dll
 TargetRefPath=<PATH>obj/x64/Debug/net8.0-windows10.0.19041.0/win-x64/ref/SvchostMonitor.dll
 TemporaryDependencyNodeTargetIdentifier=net8.0-windows10.0.19041.0
