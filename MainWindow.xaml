@@ -233,6 +233,7 @@
                     <Grid Background="{StaticResource BackgroundBrush}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -290,8 +291,50 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Re-enable Progress Panel -->
+                        <Border Grid.Row="1" Visibility="{Binding IsReEnabling, Converter={StaticResource BoolToVis}}"
+                                Background="#0A00D4FF" BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="0,0,0,1" Padding="16,10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                    <TextBlock Text="RE-ENABLING SERVICE: " FontSize="10" FontWeight="Bold"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ReEnableServiceName}" FontSize="11" FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ReEnableProgress, StringFormat=' — {0:0}%'}" FontSize="10"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ProgressBar Grid.Row="1" Value="{Binding ReEnableProgress}" Minimum="0" Maximum="100"
+                                             Height="4" Margin="0,6,0,6"
+                                             Foreground="{StaticResource AccentBrush}"
+                                             Background="#1A2A2A35"/>
+                                <ItemsControl Grid.Row="2" ItemsSource="{Binding ReEnableLog}"
+                                              MaxHeight="72" Margin="0,2,0,0">
+                                    <ItemsControl.Template>
+                                        <ControlTemplate TargetType="ItemsControl">
+                                            <ScrollViewer VerticalScrollBarVisibility="Hidden" CanContentScroll="True">
+                                                <ItemsPresenter/>
+                                            </ScrollViewer>
+                                        </ControlTemplate>
+                                    </ItemsControl.Template>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="10"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Border>
+
                         <!-- DataGrid -->
-                        <DataGrid Grid.Row="1" Margin="0"
+                        <DataGrid Grid.Row="2" Margin="0"
                                   ItemsSource="{Binding ActiveConnections}"
                                   SelectedItem="{Binding SelectedConnection}">
                             <DataGrid.Columns>

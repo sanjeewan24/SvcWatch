@@ -23,6 +23,7 @@ namespace SvchostMonitor.Engine
         // Service config change constants
         internal const uint SERVICE_NO_CHANGE = 0xFFFFFFFF;
         internal const uint SERVICE_DISABLED = 0x00000004;
+        internal const uint SERVICE_DEMAND_START = 0x00000003;
         internal const uint SC_MANAGER_ALL_ACCESS = 0xF003F;
         internal const uint SERVICE_ALL_ACCESS = 0xF01FF;
 
@@ -364,6 +365,73 @@ namespace SvchostMonitor.Engine
             {
                 return new ServiceOperationResult { Success = false, ErrorMessage = ex.Message };
             }
+        }
+
+        public static ServiceOperationResult ReEnableService(string serviceName, Action<string, double> progress)
+        {
+            try
+            {
+                progress("Removing from enforcer watchlist...", 10);
+
+                progress($"Setting '{serviceName}' startup type to Manual...", 30);
+                var startupResult = SetStartupTypeManual(serviceName);
+                if (!startupResult.Success) return startupResult;
+
+                progress($"Sending start command to '{serviceName}'...", 55);
+                using var sc = new ServiceController(serviceName);
+
+                if (sc.Status == ServiceControllerStatus.Stopped ||
+                    sc.Status == ServiceControllerStatus.StopPending)
+                {
+                    sc.Start();
+                }
+
+                progress($"Waiting for '{serviceName}' to reach Running state...", 75);
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+
+                progress($"Verifying '{serviceName}' is running...", 92);
+                sc.Refresh();
+                if (sc.Status != ServiceControllerStatus.Running)
+                    return new ServiceOperationResult { Success = false, ErrorMessage = "Service did not reach Running state." };
+
+                progress($"'{serviceName}' is now active.", 100);
+                return new ServiceOperationResult { Success = true };
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 5)
+            {
+                return new ServiceOperationResult { Success = false, ErrorMessage = $"Access denied. Cannot modify '{serviceName}'." };
+            }
+            catch (Exception ex)
+            {
+                return new ServiceOperationResult { Success = false, ErrorMessage = ex.Message };
+            }
+        }
+
+        private static ServiceOperationResult SetStartupTypeManual(string serviceName)
+        {
+            IntPtr scmHandle = NativeMethods.OpenSCManager(null, null, NativeMethods.SC_MANAGER_ALL_ACCESS);
+            if (scmHandle == IntPtr.Zero)
+                return new ServiceOperationResult { Success = false, ErrorMessage = $"OpenSCManager failed. Win32 error: {Marshal.GetLastWin32Error()}" };
+
+            IntPtr svcHandle = NativeMethods.OpenService(scmHandle, serviceName, NativeMethods.SERVICE_ALL_ACCESS);
+            if (svcHandle == IntPtr.Zero)
+            {
+                NativeMethods.CloseServiceHandle(scmHandle);
+                return new ServiceOperationResult { Success = false, ErrorMessage = $"OpenService failed. Win32 error: {Marshal.GetLastWin32Error()}" };
+            }
+
+            bool changed = NativeMethods.ChangeServiceConfig(
+                svcHandle, NativeMethods.SERVICE_NO_CHANGE,
+                NativeMethods.SERVICE_DEMAND_START,
+                NativeMethods.SERVICE_NO_CHANGE,
+                null, null, IntPtr.Zero, null, null, null, null);
+
+            NativeMethods.CloseServiceHandle(svcHandle);
+            NativeMethods.CloseServiceHandle(scmHandle);
+
+            return changed
+                ? new ServiceOperationResult { Success = true }
+                : new ServiceOperationResult { Success = false, ErrorMessage = $"ChangeServiceConfig failed. Win32 error: {Marshal.GetLastWin32Error()}" };
         }
 
         private static ServiceOperationResult SetStartupTypeDisabled(string serviceName)

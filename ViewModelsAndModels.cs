@@ -1,23 +1,15 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiteDB;
 using SvchostMonitor.Engine;
 using SvchostMonitor.Models;
 
-// ──────────────────────────────────────────
-//  ENUMS
-// ──────────────────────────────────────────
 namespace SvchostMonitor.Models
 {
     public enum EnforcedState { None, EnforceDisabled, Ignore }
-
     public enum LogAction { StateChanged, Error, NetworkDetected, Enforced }
 
-    // ──────────────────────────────────────────
-    //  LiteDB PERSISTENCE MODELS
-    // ──────────────────────────────────────────
     public class TrackedService
     {
         public ObjectId Id { get; set; } = ObjectId.NewObjectId();
@@ -47,11 +39,6 @@ namespace SvchostMonitor.Models
         public bool EnableNotifications { get; set; } = true;
     }
 
-    // ──────────────────────────────────────────
-    //  UI VIEW MODELS (Observable wrappers)
-    // ──────────────────────────────────────────
-
-    /// <summary>Represents one active svchost network connection row in the Dashboard DataGrid.</summary>
     public partial class NetworkConnectionViewModel : ObservableObject
     {
         [ObservableProperty] private string _serviceName = string.Empty;
@@ -63,7 +50,6 @@ namespace SvchostMonitor.Models
         [ObservableProperty] private bool _isDisabled;
     }
 
-    /// <summary>Represents a tracked service with its log history for the Logs Tab.</summary>
     public partial class TrackedServiceViewModel : ObservableObject
     {
         [ObservableProperty] private string _serviceName = string.Empty;
@@ -74,13 +60,11 @@ namespace SvchostMonitor.Models
     }
 }
 
-// ──────────────────────────────────────────
-//  MAIN VIEW MODEL
-// ──────────────────────────────────────────
 namespace SvchostMonitor.ViewModels
 {
     using SvchostMonitor.Models;
     using SvchostMonitor.Engine;
+    using WpfApp = System.Windows.Application;
 
     public partial class MainViewModel : ObservableObject
     {
@@ -95,13 +79,18 @@ namespace SvchostMonitor.ViewModels
         [ObservableProperty] private DateTime _lastRefreshTime = DateTime.Now;
         [ObservableProperty] private NetworkConnectionViewModel? _selectedConnection;
 
+        // ── Re-enable progress state ─────────────────────────────────────
+        [ObservableProperty] private bool _isReEnabling;
+        [ObservableProperty] private double _reEnableProgress;
+        [ObservableProperty] private string _reEnableServiceName = string.Empty;
+        public ObservableCollection<string> ReEnableLog { get; } = new();
+
         public ObservableCollection<NetworkConnectionViewModel> ActiveConnections { get; } = new();
         public ObservableCollection<TrackedServiceViewModel> TrackedServices { get; } = new();
 
         partial void OnIsPausedChanged(bool value)
         {
-            if (_enforcer != null)
-                _enforcer.IsPaused = value;
+            if (_enforcer != null) _enforcer.IsPaused = value;
             StatusMessage = value ? "Enforcer paused by user." : "Enforcer resumed.";
         }
 
@@ -109,7 +98,6 @@ namespace SvchostMonitor.ViewModels
         {
             StatusMessage = "Scanning network connections...";
             await RefreshAsync();
-
             _enforcer = new BackgroundEnforcer(OnBreachDetected);
             _enforcer.Start();
             StatusMessage = "Monitoring active. Background enforcer running.";
@@ -123,7 +111,7 @@ namespace SvchostMonitor.ViewModels
                 StatusMessage = "Refreshing...";
                 var connections = await Task.Run(() => NetworkMapper.GetSvchostConnections());
 
-                Application.Current.Dispatcher.Invoke(() =>
+                WpfApp.Current.Dispatcher.Invoke(() =>
                 {
                     lock (_uiLock)
                     {
@@ -149,7 +137,6 @@ namespace SvchostMonitor.ViewModels
 
                         ActiveCount = ActiveConnections.Count;
                         EnforcedCount = disabledServices.Count;
-
                         RefreshTrackedServicesView();
                         LastRefreshTime = DateTime.Now;
                         StatusMessage = $"Found {ActiveCount} active svchost connection(s).";
@@ -167,24 +154,13 @@ namespace SvchostMonitor.ViewModels
         {
             if (conn == null) return;
 
-            if (!conn.IsDisabled)
+            // After TwoWay binding fires, IsDisabled is already toggled.
+            // IsDisabled=false means user wants to RE-ENABLE (was disabled, now wants active)
+            // IsDisabled=true means user wants to DISABLE (was active, now wants disabled)
+
+            if (conn.IsDisabled)
             {
-                // Re-enable: remove from enforcer
-                await Task.Run(() =>
-                {
-                    DatabaseHelper.Instance.RemoveTrackedService(conn.ServiceName);
-                    DatabaseHelper.Instance.AddLog(new ServiceLogEntry
-                    {
-                        ServiceName = conn.ServiceName,
-                        Action = LogAction.StateChanged,
-                        Message = $"Service '{conn.ServiceName}' removed from enforcement list."
-                    });
-                });
-                conn.IsDisabled = false;
-            }
-            else
-            {
-                // Disable: stop + enforce
+                // ── DISABLE PATH ─────────────────────────────────────────
                 var result = await Task.Run(() => ServiceControlManager.StopAndDisable(conn.ServiceName));
                 if (result.Success)
                 {
@@ -200,7 +176,6 @@ namespace SvchostMonitor.ViewModels
                         Action = LogAction.StateChanged,
                         Message = $"Service '{conn.ServiceName}' stopped and set to Disabled."
                     });
-                    conn.IsDisabled = true;
                     EnforcedCount = DatabaseHelper.Instance.GetTrackedServices()
                         .Count(s => s.DesiredState == EnforcedState.EnforceDisabled);
                 }
@@ -217,13 +192,80 @@ namespace SvchostMonitor.ViewModels
                     StatusMessage = $"Error: {result.ErrorMessage}";
                 }
             }
+            else
+            {
+                // ── RE-ENABLE PATH with progress ─────────────────────────
+                await ReEnableWithProgressAsync(conn);
+            }
 
-            Application.Current.Dispatcher.Invoke(RefreshTrackedServicesView);
+            WpfApp.Current.Dispatcher.Invoke(RefreshTrackedServicesView);
+        }
+
+        private async Task ReEnableWithProgressAsync(NetworkConnectionViewModel conn)
+        {
+            WpfApp.Current.Dispatcher.Invoke(() =>
+            {
+                IsReEnabling = true;
+                ReEnableProgress = 0;
+                ReEnableServiceName = conn.ServiceName;
+                ReEnableLog.Clear();
+                ReEnableLog.Add($"[{DateTime.Now:HH:mm:ss}] Starting re-enable for '{conn.ServiceName}'...");
+            });
+
+            void Log(string msg, double pct)
+            {
+                WpfApp.Current.Dispatcher.Invoke(() =>
+                {
+                    ReEnableLog.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
+                    ReEnableProgress = pct;
+                    StatusMessage = msg;
+                });
+            }
+
+            var result = await Task.Run(() =>
+                ServiceControlManager.ReEnableService(conn.ServiceName, (msg, pct) => Log(msg, pct)));
+
+            WpfApp.Current.Dispatcher.Invoke(() =>
+            {
+                if (result.Success)
+                {
+                    ReEnableProgress = 100;
+                    ReEnableLog.Add($"[{DateTime.Now:HH:mm:ss}] ✓ '{conn.ServiceName}' is now active and running.");
+                    DatabaseHelper.Instance.RemoveTrackedService(conn.ServiceName);
+                    DatabaseHelper.Instance.AddLog(new ServiceLogEntry
+                    {
+                        ServiceName = conn.ServiceName,
+                        Action = LogAction.StateChanged,
+                        Message = $"Service '{conn.ServiceName}' re-enabled and started successfully."
+                    });
+                    EnforcedCount = DatabaseHelper.Instance.GetTrackedServices()
+                        .Count(s => s.DesiredState == EnforcedState.EnforceDisabled);
+                    conn.IsDisabled = false;
+                    StatusMessage = $"'{conn.ServiceName}' re-enabled successfully.";
+                }
+                else
+                {
+                    ReEnableLog.Add($"[{DateTime.Now:HH:mm:ss}] ✗ Failed: {result.ErrorMessage}");
+                    conn.IsDisabled = true;
+                    StatusMessage = $"Re-enable failed: {result.ErrorMessage}";
+                    DatabaseHelper.Instance.AddLog(new ServiceLogEntry
+                    {
+                        ServiceName = conn.ServiceName,
+                        Action = LogAction.Error,
+                        Message = $"Re-enable failed: {result.ErrorMessage}",
+                        ExceptionDetails = result.ErrorMessage
+                    });
+                }
+
+                // Keep panel visible 2s then hide
+                Task.Delay(2000).ContinueWith(_ =>
+                    WpfApp.Current.Dispatcher.Invoke(() => IsReEnabling = false));
+            });
         }
 
         private void OnBreachDetected(string serviceName)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            WpfApp.Current.Dispatcher.Invoke(() =>
             {
                 BreachCount++;
                 StatusMessage = $"BREACH: '{serviceName}' restarted and was re-disabled at {DateTime.Now:HH:mm:ss}";
@@ -255,8 +297,7 @@ namespace SvchostMonitor.ViewModels
                         LogCount = logs.Count,
                         LastAction = logs.FirstOrDefault()?.Timestamp ?? svc.DateAdded
                     };
-                    foreach (var log in logs)
-                        newVm.LogEntries.Add(log);
+                    foreach (var log in logs) newVm.LogEntries.Add(log);
                     TrackedServices.Add(newVm);
                 }
                 else
@@ -265,17 +306,14 @@ namespace SvchostMonitor.ViewModels
                     existing.LogCount = logs.Count;
                     existing.LastAction = logs.FirstOrDefault()?.Timestamp ?? svc.DateAdded;
                     existing.LogEntries.Clear();
-                    foreach (var log in logs)
-                        existing.LogEntries.Add(log);
+                    foreach (var log in logs) existing.LogEntries.Add(log);
                 }
             }
 
-            // Remove stale entries
             var toRemove = TrackedServices
                 .Where(t => !dbServices.Any(s => s.ServiceName.Equals(t.ServiceName, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-            foreach (var t in toRemove)
-                TrackedServices.Remove(t);
+            foreach (var t in toRemove) TrackedServices.Remove(t);
         }
     }
 }

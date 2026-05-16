@@ -24,23 +24,14 @@ public partial class MainWindow : Window
             DragMove();
     }
 
-    private void Minimize_Click(object sender, RoutedEventArgs e)
-    {
+    private void Minimize_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
-    }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        Hide();
-        if (Application.Current.Resources["TrayIcon"] is System.Windows.FrameworkElement tray)
-            tray.Visibility = Visibility.Visible;
-    }
+    private void Close_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         e.Cancel = true;
         Hide();
-        if (Application.Current.Resources["TrayIcon"] is System.Windows.FrameworkElement tray2)
-            tray2.Visibility = Visibility.Visible;
     }
 }
