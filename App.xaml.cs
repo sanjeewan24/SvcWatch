@@ -81,12 +81,17 @@ public partial class App : System.Windows.Application
 
     private static Icon CreateIcon()
     {
+        var exeDir = System.IO.Path.GetDirectoryName(ExePath) ?? ".";
+        var icoPath = System.IO.Path.Combine(exeDir, "tray.ico");
+        if (System.IO.File.Exists(icoPath))
+            return new Icon(icoPath, 16, 16);
+
+        // Fallback: generate in memory
         var bmp = new System.Drawing.Bitmap(16, 16);
         using var g = System.Drawing.Graphics.FromImage(bmp);
         g.Clear(Color.Transparent);
         g.FillEllipse(new SolidBrush(Color.FromArgb(0, 212, 255)), 1, 1, 13, 13);
-        g.DrawEllipse(new Pen(Color.FromArgb(0, 180, 220), 1), 1, 1, 13, 13);
-        g.FillEllipse(new SolidBrush(Color.FromArgb(0, 100, 140)), 5, 5, 5, 5);
+        g.FillEllipse(new SolidBrush(Color.FromArgb(0, 30, 50)), 4, 4, 7, 7);
         return Icon.FromHandle(bmp.GetHicon());
     }
 

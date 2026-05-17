@@ -118,6 +118,9 @@ namespace SvchostMonitor.ViewModels
                         ActiveConnections.Clear();
                         var disabledServices = DatabaseHelper.Instance.GetTrackedServices()
                             .Where(s => s.DesiredState == EnforcedState.EnforceDisabled)
+                            .ToList();
+
+                        var disabledNames = disabledServices
                             .Select(s => s.ServiceName)
                             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -131,15 +134,35 @@ namespace SvchostMonitor.ViewModels
                                 Protocol = conn.Protocol,
                                 RemoteEndpoint = conn.RemoteEndpoint,
                                 LocalPort = conn.LocalPort,
-                                IsDisabled = disabledServices.Contains(conn.ServiceName)
+                                IsDisabled = disabledNames.Contains(conn.ServiceName)
                             });
                         }
 
-                        ActiveCount = ActiveConnections.Count;
-                        EnforcedCount = disabledServices.Count;
+                        // Inject disabled services that are stopped (no active connections)
+                        foreach (var svc in disabledServices)
+                        {
+                            bool alreadyShown = ActiveConnections.Any(c =>
+                                c.ServiceName.Equals(svc.ServiceName, StringComparison.OrdinalIgnoreCase));
+                            if (!alreadyShown)
+                            {
+                                ActiveConnections.Add(new NetworkConnectionViewModel
+                                {
+                                    ServiceName = svc.ServiceName,
+                                    DisplayName = svc.DisplayName,
+                                    Pid = 0,
+                                    Protocol = "—",
+                                    RemoteEndpoint = "—",
+                                    LocalPort = 0,
+                                    IsDisabled = true
+                                });
+                            }
+                        }
+
+                        ActiveCount = ActiveConnections.Count(c => !c.IsDisabled);
+                        EnforcedCount = disabledNames.Count;
                         RefreshTrackedServicesView();
                         LastRefreshTime = DateTime.Now;
-                        StatusMessage = $"Found {ActiveCount} active svchost connection(s).";
+                        StatusMessage = $"Found {ActiveCount} active, {EnforcedCount} enforced disabled.";
                     }
                 });
             }
